@@ -121,7 +121,17 @@
     background: #fff;
     width: 100%;
   }
-  #gifAssinatura { display: block; max-width: 100%; pointer-events: none; user-select: none; }
+  #gifAssinatura {
+    display: block;
+    max-width: 100%;
+    cursor: pointer;
+    outline: none;
+    border-radius: 4px;
+    transition: box-shadow 0.15s;
+  }
+  #gifAssinatura.selecionada {
+    box-shadow: 0 0 0 3px #1b5fa0;
+  }
 
   .copy-btn {
     margin-top: 1rem;
@@ -259,6 +269,10 @@
       📋 Copiar assinatura
     </button>
 
+    <p style="font-size:12px;color:#7a90a8;margin-top:8px;text-align:center;">
+      Ou clique na imagem para selecioná-la e pressione <span class="kbd">Ctrl</span> + <span class="kbd">C</span>
+    </p>
+
     <!-- PASSO A PASSO -->
     <div class="steps">
       <div class="steps-title">Como adicionar no Outlook</div>
@@ -314,9 +328,9 @@
           </div>
 
           <div class="email-links">
-            <a href="#">Conheça nossa Política de QSMA clicando aqui</a><br>
-            <a href="#">Conheça nosso Programa Integridade clicando aqui</a><br>
-            <a href="#">Para sugestões, informações, reclamações e elogios, clique aqui</a>
+            <p>Conheça nossa Política de QSMA <a href="#">clicando aqui</a></p><br>
+            <p>Conheça nosso Programa Integridade <a href="#">clicando aqui</a></p><br>
+            <p>Para sugestões, informações, reclamações e elogios, <a href="#">clique aqui</a></p>
           </div>
 
           <div class="disclaimer">
@@ -408,40 +422,49 @@ async function buscarAssinatura() {
   }
 }
 
-async function copiarAssinatura() {
+function selecionarImagem() {
   const img = document.getElementById("gifAssinatura");
-  const btn = document.getElementById("copyBtn");
-  try {
-    const response = await fetch(img.src);
-    const blob = await response.blob();
-    const bitmap = await createImageBitmap(blob);
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    canvas.getContext("2d").drawImage(bitmap, 0, 0);
-    canvas.toBlob(async (pngBlob) => {
-      try {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
-        btn.textContent = "✅ Copiado! Agora cole no Outlook (Ctrl+V)";
-        btn.classList.add("ok");
-        setTimeout(() => { btn.textContent = "📋 Copiar assinatura"; btn.classList.remove("ok"); }, 4000);
-      } catch (e) { fallbackCopy(img); }
-    }, "image/png");
-  } catch (e) { fallbackCopy(img); }
-}
-
-function fallbackCopy(img) {
   const range = document.createRange();
   range.selectNode(img);
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
-  document.execCommand("copy");
-  sel.removeAllRanges();
+  img.classList.add("selecionada");
+}
+
+function copiarAssinatura() {
+  const img = document.getElementById("gifAssinatura");
   const btn = document.getElementById("copyBtn");
-  btn.textContent = "✅ Copiado! Agora cole no Outlook (Ctrl+V)";
-  btn.classList.add("ok");
-  setTimeout(() => { btn.textContent = "📋 Copiar assinatura"; btn.classList.remove("ok"); }, 4000);
+
+  // Seleciona a imagem exatamente como Ctrl+A faria
+  const range = document.createRange();
+  range.selectNode(img);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  img.classList.add("selecionada");
+
+  // Copia a seleção — igual ao Ctrl+C manual
+  const ok = document.execCommand("copy");
+
+  if (ok) {
+    btn.textContent = "✅ Copiado! Agora cole no Outlook (Ctrl+V)";
+    btn.classList.add("ok");
+    setTimeout(() => {
+      btn.textContent = "📋 Copiar assinatura";
+      btn.classList.remove("ok");
+      sel.removeAllRanges();
+      img.classList.remove("selecionada");
+    }, 4000);
+  } else {
+    // Se execCommand falhar, mantém selecionada para o usuário copiar manualmente
+    btn.textContent = "⚠️ Pressione Ctrl+C para copiar";
+    btn.style.background = "#e6a817";
+    setTimeout(() => {
+      btn.textContent = "📋 Copiar assinatura";
+      btn.style.background = "";
+    }, 5000);
+  }
 }
 
 document.getElementById("busca").addEventListener("keydown", e => {
