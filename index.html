@@ -1,10 +1,452 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-<title>Assinaturas Fortes</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assinaturas de Email — Fortes Engenharia</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f0f4f8;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2.5rem 1rem 4rem;
+    color: #1a1a2e;
+  }
+
+  .logo-bar {
+    width: 100%;
+    max-width: 700px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 2rem;
+  }
+  .logo-bar img { height: 36px; width: auto; display: block; }
+  .logo-bar .divider { flex: 1; height: 1px; background: #c8d4e0; }
+  .logo-bar .tag {
+    font-size: 11px;
+    color: #1b5fa0;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .card {
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1px solid #dde6f0;
+    padding: 2.2rem 2.2rem 2.8rem;
+    width: 100%;
+    max-width: 700px;
+    box-shadow: 0 4px 24px rgba(27,95,160,0.07);
+  }
+
+  h1 { font-size: 22px; font-weight: 700; color: #0d2a4e; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #5a7898; margin-bottom: 2rem; line-height: 1.6; }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #1b5fa0;
+    margin-bottom: 8px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 13px 16px;
+    font-size: 15px;
+    border: 1.5px solid #c8d8ec;
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s;
+    color: #0d2a4e;
+    background: #f7fafd;
+  }
+  input[type="text"]::placeholder { color: #aac0d8; }
+  input[type="text"]:focus { border-color: #1b5fa0; background: #fff; }
+
+  .btn {
+    margin-top: 1rem;
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    background: #1b5fa0;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn:hover { background: #154d84; }
+  .btn:active { transform: scale(0.99); }
+  .btn:disabled { background: #a0b8d0; cursor: default; }
+
+  .msg {
+    display: none;
+    margin-top: 1rem;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .msg.error { background: #fff0ee; border: 1px solid #f5c6c2; color: #a93226; }
+  .msg.loading { background: #eef4fb; border: 1px solid #b8d0ea; color: #1b5fa0; }
+
+  /* ── resultado ── */
+  .result-section {
+    display: none;
+    margin-top: 2.5rem;
+    border-top: 1px solid #dde6f0;
+    padding-top: 2rem;
+  }
+
+  .result-header { display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem; }
+  .result-dot { width: 8px; height: 8px; border-radius: 50%; background: #1bc49a; flex-shrink: 0; }
+  .result-section h2 { font-size: 16px; font-weight: 700; color: #0d2a4e; }
+
+  .sig-wrapper {
+    border: 1.5px solid #dde6f0;
+    border-radius: 12px;
+    padding: 20px;
+    background: #fff;
+    width: 100%;
+  }
+  #gifAssinatura { display: block; max-width: 100%; pointer-events: none; user-select: none; }
+
+  .copy-btn {
+    margin-top: 1rem;
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    background: #1bc49a;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .copy-btn:hover { background: #16a882; }
+  .copy-btn:active { transform: scale(0.99); }
+  .copy-btn.ok { background: #0e8a66; }
+
+  /* ── passo a passo ── */
+  .steps { margin-top: 2rem; }
+  .steps-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: #1b5fa0; margin-bottom: 1.2rem;
+  }
+
+  .step { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 1rem; }
+  .step-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #eef4fb; border: 1.5px solid #1b5fa0;
+    color: #1b5fa0; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .step-text { font-size: 13.5px; color: #3a5878; line-height: 1.65; }
+  .step-text strong { font-weight: 700; color: #0d2a4e; }
+
+  .kbd {
+    display: inline-block;
+    background: #f0f4f8; border: 1px solid #c0ccd8;
+    border-bottom: 2px solid #a0b0c4;
+    border-radius: 5px; padding: 1px 8px;
+    font-family: monospace; font-size: 12px; color: #1b5fa0;
+  }
+
+  /* ── preview do email ── */
+  .preview-section { margin-top: 2rem; }
+  .preview-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: #1b5fa0; margin-bottom: 1rem;
+  }
+
+  .email-mockup {
+    border: 1px solid #dde6f0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .email-header {
+    background: #f0f4f8;
+    border-bottom: 1px solid #dde6f0;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .email-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .email-body { padding: 20px 24px; font-size: 13.5px; color: #2a3a4a; line-height: 1.7; }
+
+  .sig-placeholder {
+    margin: 12px 0;
+    border: 1.5px dashed #b8d0e8;
+    border-radius: 8px;
+    padding: 14px 18px;
+    background: #f7fafd;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: #1b5fa0; font-style: italic;
+  }
+  .sig-placeholder-icon { font-size: 20px; }
+
+  .disclaimer {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #e8eef4;
+    font-size: 11px;
+    color: #8a9fb8;
+    line-height: 1.6;
+  }
+  .disclaimer p + p { margin-top: 10px; }
+
+  .email-links { font-size: 13px; color: #3a5878; line-height: 1.9; }
+  .email-links a { color: #1b5fa0; text-decoration: underline; }
+
+  .tip-box {
+    margin-top: 1.5rem;
+    background: #eef8f4; border: 1px solid #a8dfc9;
+    border-radius: 8px; padding: 12px 16px;
+    font-size: 13px; color: #1a6e4e; line-height: 1.5;
+  }
+  .tip-box strong { color: #0e5a3e; }
+
+  @media (max-width: 500px) { .card { padding: 1.5rem 1.25rem 2rem; } }
+</style>
 </head>
 <body>
-<h1>Assinaturas de Email - Fortes Engenharia</h1>
-<p>Bem-vindo à página de assinaturas de email da Fortes Engenharia! Aqui você pode encontrar as assinaturas personalizadas para cada membro da equipe.</p>
+
+<div class="logo-bar">
+  <img src="./images/Logo.png" alt="Fortes Engenharia" />
+  <div class="divider"></div>
+  <span class="tag">Assinaturas de email</span>
+</div>
+
+<div class="card">
+  <h1>Buscar minha assinatura</h1>
+  <p class="subtitle">Digite seu nome completo para localizar e copiar sua assinatura de email personalizada.</p>
+
+  <label for="busca">Nome completo</label>
+  <input type="text" id="busca" placeholder="Digite seu nome completo" autocomplete="off" />
+  <button class="btn" id="btnBuscar" onclick="buscarAssinatura()">Buscar assinatura</button>
+
+  <div class="msg loading" id="loadingMsg">⏳ Buscando sua assinatura...</div>
+  <div class="msg error" id="errorMsg"></div>
+
+  <div class="result-section" id="resultSection">
+
+    <div class="result-header">
+      <div class="result-dot"></div>
+      <h2 id="nomeColaborador"></h2>
+    </div>
+
+    <div class="sig-wrapper">
+      <img id="gifAssinatura" src="" alt="Assinatura de email" />
+    </div>
+
+    <button class="copy-btn" id="copyBtn" onclick="copiarAssinatura()">
+      📋 Copiar assinatura
+    </button>
+
+    <!-- PASSO A PASSO -->
+    <div class="steps">
+      <div class="steps-title">Como adicionar no Outlook</div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">
+          Clique em <strong>"Copiar assinatura"</strong> acima — a imagem é copiada automaticamente.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">
+          No Outlook, vá em <strong>Arquivo → Opções → Email → Assinaturas → Nova</strong> e dê um nome (ex: "Fortes Engenharia").
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">
+          No campo de texto da assinatura, pressione <span class="kbd">Ctrl</span> + <span class="kbd">V</span> para colar a imagem.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">
+          Antes da assinatura, adicione o texto padrão conforme o modelo abaixo. Clique em <strong>OK</strong> e defina como padrão. ✅
+        </div>
+      </div>
+    </div>
+
+    <!-- PREVIEW DO EMAIL -->
+    <div class="preview-section">
+      <div class="preview-title">Como deve ficar seu email</div>
+
+      <div class="email-mockup">
+        <div class="email-header">
+          <div class="email-dot" style="background:#f5a623;"></div>
+          <div class="email-dot" style="background:#7ed321;"></div>
+          <div class="email-dot" style="background:#4a90e2;"></div>
+          <span style="font-size:12px;color:#7a90a8;margin-left:6px;">Nova mensagem — Outlook</span>
+        </div>
+        <div class="email-body">
+
+          <p style="color:#5a7898;font-style:italic;font-size:13px;margin-bottom:16px;">
+            [ Corpo do email aqui ]
+          </p>
+
+          <p>Atenciosamente,</p>
+
+          <div class="sig-placeholder">
+            <span class="sig-placeholder-icon">🖼️</span>
+            <span>Sua assinatura de email (imagem copiada acima)</span>
+          </div>
+
+          <div class="email-links">
+            <a href="#">Conheça nossa Política de QSMA clicando aqui</a><br>
+            <a href="#">Conheça nosso Programa Integridade clicando aqui</a><br>
+            <a href="#">Para sugestões, informações, reclamações e elogios, clique aqui</a>
+          </div>
+
+          <div class="disclaimer">
+            <p>AVISO LEGAL: Esta mensagem e seus anexos podem conter informações confidenciais e/ou legalmente protegidas, inclusive por sigilo profissional ou lei de proteção de dados pessoais. O seu uso é exclusivo para seu(s) destinatário(s) ou pessoas expressamente autorizadas a recebê-la. Se você recebeu esta mensagem por engano, por favor avise imediatamente ao remetente respondendo o e-mail e, em seguida, apague a mensagem e seus anexos. É proibido o uso, a divulgação ou a disponibilização de tais informações a terceiros. O descumprimento das orientações expostas sujeitará o responsável às penalidades civis e criminais cabíveis.</p>
+            <p>DISCLAIMER: This message and its attachments may contain confidential and/or legally protected information, including professional secrecy or personal data protection law. Its use is exclusive to its recipient(s) or persons expressly authorized to receive it. If you received this message by mistake, please notify the sender immediately by replying to the email, and then, delete the message and its attachments. The use, disclosure or availability of such information to third parties is prohibited. Failure to comply with the guidelines described will subject the responsible person to the appropriate civil and criminal penalties.</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="tip-box" style="margin-top:1.5rem;">
+      <strong>Dica:</strong> Copie o texto do aviso legal acima e cole logo após a imagem da assinatura no campo de assinatura do Outlook.
+    </div>
+
+  </div>
+</div>
+
+<script>
+const BASE_URL = "https://fortes-engenharia-ltda.github.io/AssinaturasEmail/images/Assinaturas/";
+const EXTENSOES = ["gif", "png", "jpg", "jpeg", "webp"];
+
+function nomeParaArquivo(nome) {
+  return nome
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z\s]/g, "")
+    .split(/\s+/)
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join("");
+}
+
+function tentarURL(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(url);
+    img.onerror = () => reject();
+    img.src = url + "?t=" + Date.now();
+  });
+}
+
+async function encontrarArquivo(nomeBase) {
+  for (const ext of EXTENSOES) {
+    try { return await tentarURL(BASE_URL + nomeBase + "." + ext); }
+    catch (_) {}
+  }
+  return null;
+}
+
+async function buscarAssinatura() {
+  const input = document.getElementById("busca").value.trim();
+  const resultSection = document.getElementById("resultSection");
+  const errorMsg = document.getElementById("errorMsg");
+  const loadingMsg = document.getElementById("loadingMsg");
+  const btn = document.getElementById("btnBuscar");
+
+  resultSection.style.display = "none";
+  errorMsg.style.display = "none";
+  loadingMsg.style.display = "none";
+
+  if (!input) return;
+  const nomeBase = nomeParaArquivo(input);
+  if (!nomeBase) return;
+
+  loadingMsg.style.display = "block";
+  btn.disabled = true;
+
+  const url = await encontrarArquivo(nomeBase);
+
+  loadingMsg.style.display = "none";
+  btn.disabled = false;
+
+  if (url) {
+    document.getElementById("nomeColaborador").textContent = input;
+    const img = document.getElementById("gifAssinatura");
+    img.src = url;
+    img.onload = () => {
+      resultSection.style.display = "block";
+      resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    document.getElementById("copyBtn").textContent = "📋 Copiar assinatura";
+    document.getElementById("copyBtn").classList.remove("ok");
+  } else {
+    errorMsg.innerHTML =
+      "Nenhuma assinatura encontrada para <strong>\"" + input + "\"</strong>.<br>" +
+      "Verifique se o arquivo está salvo como <strong>" + nomeParaArquivo(input) + ".gif</strong> (ou .png) na pasta <em>images/Assinaturas/</em> do repositório.";
+    errorMsg.style.display = "block";
+  }
+}
+
+async function copiarAssinatura() {
+  const img = document.getElementById("gifAssinatura");
+  const btn = document.getElementById("copyBtn");
+  try {
+    const response = await fetch(img.src);
+    const blob = await response.blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext("2d").drawImage(bitmap, 0, 0);
+    canvas.toBlob(async (pngBlob) => {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+        btn.textContent = "✅ Copiado! Agora cole no Outlook (Ctrl+V)";
+        btn.classList.add("ok");
+        setTimeout(() => { btn.textContent = "📋 Copiar assinatura"; btn.classList.remove("ok"); }, 4000);
+      } catch (e) { fallbackCopy(img); }
+    }, "image/png");
+  } catch (e) { fallbackCopy(img); }
+}
+
+function fallbackCopy(img) {
+  const range = document.createRange();
+  range.selectNode(img);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand("copy");
+  sel.removeAllRanges();
+  const btn = document.getElementById("copyBtn");
+  btn.textContent = "✅ Copiado! Agora cole no Outlook (Ctrl+V)";
+  btn.classList.add("ok");
+  setTimeout(() => { btn.textContent = "📋 Copiar assinatura"; btn.classList.remove("ok"); }, 4000);
+}
+
+document.getElementById("busca").addEventListener("keydown", e => {
+  if (e.key === "Enter") buscarAssinatura();
+});
+</script>
 </body>
 </html>
