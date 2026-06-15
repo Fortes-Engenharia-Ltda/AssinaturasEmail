@@ -102,7 +102,6 @@
   .msg.error { background: #fff0ee; border: 1px solid #f5c6c2; color: #a93226; }
   .msg.loading { background: #eef4fb; border: 1px solid #b8d0ea; color: #1b5fa0; }
 
-  /* ── resultado ── */
   .result-section {
     display: none;
     margin-top: 2.5rem;
@@ -150,7 +149,6 @@
   .copy-btn:active { transform: scale(0.99); }
   .copy-btn.ok { background: #0e8a66; }
 
-  /* ── passo a passo ── */
   .steps { margin-top: 2rem; }
   .steps-title {
     font-size: 11px; font-weight: 700;
@@ -177,7 +175,6 @@
     font-family: monospace; font-size: 12px; color: #1b5fa0;
   }
 
-  /* ── preview do email ── */
   .preview-section { margin-top: 2rem; }
   .preview-title {
     font-size: 11px; font-weight: 700;
@@ -273,7 +270,6 @@
       Ou clique na imagem para selecioná-la e pressione <span class="kbd">Ctrl</span> + <span class="kbd">C</span>
     </p>
 
-    <!-- PASSO A PASSO -->
     <div class="steps">
       <div class="steps-title">Como adicionar no Outlook</div>
 
@@ -303,7 +299,6 @@
       </div>
     </div>
 
-    <!-- PREVIEW DO EMAIL -->
     <div class="preview-section">
       <div class="preview-title">Como deve ficar seu email</div>
 
@@ -345,9 +340,17 @@
   </div>
 </div>
 
+<!-- omggif: decodifica GIF animado frame a frame -->
+<script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.js"></script>
+<!-- gif.js: recodifica GIF animado no browser via Web Worker inline -->
+<script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
+
 <script>
-const BASE_URL = "https://fortes-engenharia-ltda.github.io/AssinaturasEmail/images/Assinaturas/";
+const BASE_URL  = "https://fortes-engenharia-ltda.github.io/AssinaturasEmail/images/Assinaturas/";
 const EXTENSOES = ["gif", "png", "jpg", "jpeg", "webp"];
+const MAX_BYTES = 1024 * 1024; // 1 MB
+
+// ─── utilidades ───────────────────────────────────────────────────────────────
 
 function nomeParaArquivo(nome) {
   return nome
@@ -363,7 +366,7 @@ function nomeParaArquivo(nome) {
 function tentarURL(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(url);
+    img.onload  = () => resolve(url);
     img.onerror = () => reject();
     img.src = url + "?t=" + Date.now();
   });
@@ -377,40 +380,219 @@ async function encontrarArquivo(nomeBase) {
   return null;
 }
 
+// Baixa a URL como ArrayBuffer (necessário para decodificar GIF)
+async function fetchBuffer(url) {
+  const res = await fetch(url + "?t=" + Date.now());
+  if (!res.ok) throw new Error("fetch falhou");
+  return res.arrayBuffer();
+}
+
+// ─── compressão de GIF animado ────────────────────────────────────────────────
+// Estratégia:
+//   1. Decodifica todos os frames com omggif
+//   2. Redimensiona progressivamente (80 %, 65 %, 50 %…) até o GIF resultante
+//      ficar abaixo de 1 MB
+//   3. Recodifica com gif.js mantendo delays e loopCount originais
+
+function decodeGifFrames(buffer) {
+  const bytes  = new Uint8Array(buffer);
+  const reader = new GifReader(bytes);
+  const frames = [];
+
+  for (let i = 0; i < reader.numFrames(); i++) {
+    const info   = reader.frameInfo(i);
+    const pixels = new Uint8ClampedArray(reader.width * reader.height * 4);
+    reader.decodeAndBlitFrameRGBA(i, pixels);
+    frames.push({
+      imageData: new ImageData(pixels, reader.width, reader.height),
+      delay: info.delay * 10,   // centisegundos → milissegundos
+      disposal: info.disposal
+    });
+  }
+
+  return { frames, width: reader.width, height: reader.height, loops: reader.loopCount };
+}
+
+function encodeGif(frames, width, height, loops) {
+  return new Promise((resolve, reject) => {
+    const gif = new GIF({
+      workers: 2,
+      quality: 10,        // 1 = melhor, 30 = mais rápido/menor
+      width,
+      height,
+      repeat: loops === null ? -1 : loops
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width  = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    for (const f of frames) {
+      ctx.clearRect(0, 0, width, height);
+      ctx.putImageData(f.imageData, 0, 0);
+      gif.addFrame(ctx, { copy: true, delay: f.delay || 100 });
+    }
+
+    gif.on("finished", blob => resolve(blob));
+    gif.on("error",    err  => reject(err));
+    gif.render();
+  });
+}
+
+// Redimensiona um frame para novas dimensões
+function resizeFrame(frame, newW, newH, origW, origH) {
+  const canvas = document.createElement("canvas");
+  canvas.width  = newW;
+  canvas.height = newH;
+  const ctx = canvas.getContext("2d");
+
+  // Desenha o frame original em tamanho reduzido
+  const tmp = document.createElement("canvas");
+  tmp.width  = origW;
+  tmp.height = origH;
+  tmp.getContext("2d").putImageData(frame.imageData, 0, 0);
+
+  ctx.drawImage(tmp, 0, 0, newW, newH);
+
+  return {
+    imageData: ctx.getImageData(0, 0, newW, newH),
+    delay: frame.delay,
+    disposal: frame.disposal
+  };
+}
+
+async function comprimirGif(buffer) {
+  const { frames, width, height, loops } = decodeGifFrames(buffer);
+
+  // Escalas a tentar em ordem: sem redução → 80% → 65% → 50% → 40% → 30%
+  const escalas = [1.0, 0.8, 0.65, 0.5, 0.4, 0.3];
+
+  for (const escala of escalas) {
+    const newW = Math.max(1, Math.round(width  * escala));
+    const newH = Math.max(1, Math.round(height * escala));
+
+    const framesRedim = escala === 1.0
+      ? frames
+      : frames.map(f => resizeFrame(f, newW, newH, width, height));
+
+    const blob = await encodeGif(framesRedim, newW, newH, loops);
+
+    if (blob.size <= MAX_BYTES) {
+      return await blobToDataUrl(blob);
+    }
+  }
+
+  // Se nem a 30% couber, retorna null → fallback para URL original
+  return null;
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result);
+    reader.onerror = () => reject();
+    reader.readAsDataURL(blob);
+  });
+}
+
+// ─── compressão de imagens estáticas (PNG / JPEG / WebP) ─────────────────────
+
+async function comprimirImagemEstatica(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+
+      // Tenta PNG sem perdas
+      let resultado = canvas.toDataURL("image/png");
+      if (resultado.length * 0.75 <= MAX_BYTES) { resolve(resultado); return; }
+
+      // Reduz qualidade em JPEG
+      let q = 0.92;
+      do {
+        resultado = canvas.toDataURL("image/jpeg", q);
+        q -= 0.08;
+      } while (resultado.length * 0.75 > MAX_BYTES && q > 0.1);
+
+      resolve(resultado);
+    };
+    img.onerror = () => resolve(null);
+    img.src = url + "?t=" + Date.now();
+  });
+}
+
+// ─── roteador principal de compressão ────────────────────────────────────────
+
+async function comprimirImagem(url) {
+  const ehGif = url.split("?")[0].toLowerCase().endsWith(".gif");
+
+  if (ehGif) {
+    try {
+      const buffer = await fetchBuffer(url);
+      // Se já estiver abaixo de 1 MB, não faz nada
+      if (buffer.byteLength <= MAX_BYTES) {
+        return await blobToDataUrl(new Blob([buffer], { type: "image/gif" }));
+      }
+      return await comprimirGif(buffer);
+    } catch (e) {
+      console.warn("Compressão de GIF falhou, usando original:", e);
+      return null; // fallback → URL original
+    }
+  }
+
+  return await comprimirImagemEstatica(url);
+}
+
+// ─── fluxo principal ─────────────────────────────────────────────────────────
+
 async function buscarAssinatura() {
-  const input = document.getElementById("busca").value.trim();
+  const input       = document.getElementById("busca").value.trim();
   const resultSection = document.getElementById("resultSection");
-  const errorMsg = document.getElementById("errorMsg");
-  const loadingMsg = document.getElementById("loadingMsg");
-  const btn = document.getElementById("btnBuscar");
+  const errorMsg    = document.getElementById("errorMsg");
+  const loadingMsg  = document.getElementById("loadingMsg");
+  const btn         = document.getElementById("btnBuscar");
 
   resultSection.style.display = "none";
-  errorMsg.style.display = "none";
-  loadingMsg.style.display = "none";
+  errorMsg.style.display      = "none";
+  loadingMsg.style.display    = "none";
 
   if (!input) return;
   const nomeBase = nomeParaArquivo(input);
   if (!nomeBase) return;
 
   loadingMsg.style.display = "block";
+  loadingMsg.textContent   = "⏳ Buscando sua assinatura...";
   btn.disabled = true;
 
   const url = await encontrarArquivo(nomeBase);
 
-  loadingMsg.style.display = "none";
-  btn.disabled = false;
-
   if (url) {
+    loadingMsg.textContent = "⚙️ Otimizando imagem... (pode levar alguns segundos)";
+
+    const dataUrl = await comprimirImagem(url);
+
+    loadingMsg.style.display = "none";
+    btn.disabled = false;
+
     document.getElementById("nomeColaborador").textContent = input;
     const img = document.getElementById("gifAssinatura");
-    img.src = url;
+    img.src = dataUrl || url;
     img.onload = () => {
       resultSection.style.display = "block";
       resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
     };
+
     document.getElementById("copyBtn").textContent = "📋 Copiar assinatura";
     document.getElementById("copyBtn").classList.remove("ok");
   } else {
+    loadingMsg.style.display = "none";
+    btn.disabled = false;
+
     errorMsg.innerHTML =
       "Nenhuma assinatura encontrada para <strong>\"" + input + "\"</strong>.<br>" +
       "Verifique com o setor de <strong>Comunicação</strong> se a assinatura está disponível.";
@@ -418,8 +600,10 @@ async function buscarAssinatura() {
   }
 }
 
+// ─── copiar assinatura ────────────────────────────────────────────────────────
+
 function selecionarImagem() {
-  const img = document.getElementById("gifAssinatura");
+  const img   = document.getElementById("gifAssinatura");
   const range = document.createRange();
   range.selectNode(img);
   const sel = window.getSelection();
@@ -432,7 +616,6 @@ function copiarAssinatura() {
   const img = document.getElementById("gifAssinatura");
   const btn = document.getElementById("copyBtn");
 
-  // Seleciona a imagem exatamente como Ctrl+A faria
   const range = document.createRange();
   range.selectNode(img);
   const sel = window.getSelection();
@@ -440,7 +623,6 @@ function copiarAssinatura() {
   sel.addRange(range);
   img.classList.add("selecionada");
 
-  // Copia a seleção — igual ao Ctrl+C manual
   const ok = document.execCommand("copy");
 
   if (ok) {
@@ -453,7 +635,6 @@ function copiarAssinatura() {
       img.classList.remove("selecionada");
     }, 4000);
   } else {
-    // Se execCommand falhar, mantém selecionada para o usuário copiar manualmente
     btn.textContent = "⚠️ Pressione Ctrl+C para copiar";
     btn.style.background = "#e6a817";
     setTimeout(() => {
